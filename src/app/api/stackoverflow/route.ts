@@ -82,3 +82,5 @@ export async function GET () {
 		return CatchNextResponse(err);
 	}
 }
+
+export const revalidate = 0;
