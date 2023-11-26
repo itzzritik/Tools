@@ -2,7 +2,11 @@
 	"crons": [
 		{
 			"path": "/api/stackoverflow",
-			"schedule": "0 5 * * *"
+			"schedule": "0 9 * * *"
+		},
+		{
+			"path": "/api/stackoverflow",
+			"schedule": "0 21 * * *"
 		}
 	]
 }
