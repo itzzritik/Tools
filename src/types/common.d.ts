@@ -1,6 +1,4 @@
-declare global {
-	interface NextResponseError {
-		status: number;
-		message: string;
-	}
+interface NextResponseError {
+	status: number;
+	message: string;
 }
