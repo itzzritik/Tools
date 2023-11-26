@@ -49,6 +49,7 @@ export async function GET () {
 		logs = [];
 
 		logs.push('• Launching browser');
+		await sendToTelegram('Stackoverflow Session Triggered', logs);
 		const browser = await getBrowser();
 		logs.push('		◦ Launched successfully');
 
@@ -83,4 +84,7 @@ export async function GET () {
 	}
 }
 
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 export const revalidate = 0;
+export const maxDuration = 10;
