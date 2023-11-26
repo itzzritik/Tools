@@ -5,7 +5,7 @@ import { CatchNextResponse, getBrowser } from '#utils/helper/helper';
 import { sendToTelegram } from '#utils/helper/sendMessage';
 
 let session = false;
-let error = false;
+let error: TError;
 
 const login = async (browser: Browser) => {
 	const loginPage = await browser.newPage();
@@ -41,7 +41,7 @@ const openRandomQuestion = async (browser: Browser) => {
 export async function GET () {
 	try {
 		session = false;
-		error = false;
+		error = undefined as unknown as TError;
 
 		await sendToTelegram('[Started] Stack overflow session triggered');
 		const browser = await getBrowser();
@@ -56,7 +56,8 @@ export async function GET () {
 		try {
 			await checkSession(browser);
 		} catch (err) {
-			error = true;
+			if (!error) error = {} as TError;
+			error.session = err.message;
 			await sendToTelegram(`Error: ${err.message}`);
 			console.log(`CheckSession: ${err.message}`);
 		}
@@ -64,7 +65,8 @@ export async function GET () {
 		try {
 			await openRandomQuestion(browser);
 		} catch (err) {
-			error = true;
+			if (!error) error = {} as TError;
+			error.question = err.message;
 			await sendToTelegram(`Error: ${err.message}`);
 			console.log(`OpenRandomQuestion: ${err.message}`);
 		}
@@ -74,9 +76,13 @@ export async function GET () {
 		await sendToTelegram(report);
 		await browser.close();
 
+		if (error) return NextResponse.json({ status: 500, ...error });
+
 		return NextResponse.json({ status: 200, message: report });
 	} catch (err) {
 		console.log(err);
 		return CatchNextResponse(err);
 	}
 }
+
+type TError = {session: string, question: string}
