@@ -1,86 +1,127 @@
 import { NextResponse } from 'next/server';
-import { Browser } from 'puppeteer';
+import puppeteer, { Browser } from 'puppeteer';
 
-import { CatchNextResponse, getBrowser } from '#utils/helper/helper';
 import { sendToTelegram } from '#utils/helper/sendMessage';
 
-let logs: Array<string> = [];
+const title = 'Stackoverflow Session Triggered';
+const button = { text: 'Failed, Trigger Manually', url: 'https://stackoverflow.com' };
+let error = false;
+let logs: string[] = [];
 
 const login = async (browser: Browser) => {
 	const loginPage = await browser.newPage();
 	await loginPage.setViewport({ width: 1920, height: 1080 });
 	await loginPage.goto('https://stackoverflow.com/users/login');
-	logs.push('		◦ Launched login page');
+	logger('		◦ Launched login page');
 	await loginPage.waitForSelector('#password', { timeout: 6000 });
 	await loginPage.type('#email', process.env.STACK_OVERFLOW_EMAIL ?? '');
 	await loginPage.type('#password', process.env.STACK_OVERFLOW_PASSWORD ?? '');
 
-	await (await loginPage.$('#password'))?.press('Enter');
-	logs.push('		◦ Logging in');
+	const submitButton = await loginPage.$('#submit-button');
+	await submitButton?.click();
+	logger('		◦ Logging in');
+
 	await loginPage.waitForNavigation();
+	await loginPage.close();
+	logger('		◦ Login complete');
 };
 
 const checkSession = async (browser: Browser) => {
-	const settingsPage = await browser.newPage();
-	await settingsPage.setViewport({ width: 1920, height: 1080 });
-	await settingsPage.goto('https://stackoverflow.com/users/preferences');
-	logs.push('		◦ Launched profile page');
-	await settingsPage.waitForSelector('#mainbar-full', { timeout: 6000 });
-	logs.push('		◦ Profile page worked, (Session Exists)');
+	let profilePage;
+
+	try {
+		profilePage = await browser.newPage();
+	}
+	catch (e) {
+		profilePage = await browser.newPage();
+	}
+
+	if (!profilePage) throw 'Unable to launch new browser tab';
+
+	await profilePage.setViewport({ width: 1920, height: 1080 });
+	await profilePage.goto('https://stackoverflow.com');
+	logger('		◦ Launched stackoverflow home page');
+
+	const profileIcon = await profilePage.$('header > div > nav > ol > li:nth-child(2) > a');
+
+	if (profileIcon) {
+		await profileIcon?.click();
+		logger('		◦ Clicked profile icon');
+	}
+
+	await profilePage.waitForSelector('#mainbar-full', { timeout: 12000 });
+	logger('		◦ Profile page worked, (Session Exists)');
+
+	const streakElement = await profilePage.$('.wmx2 div span');
+	if (streakElement) {
+		const streak = await profilePage.evaluate((elem) => elem.textContent, streakElement);
+		logger('		◦ Current streak: ' + streak);
+	}
 };
 
 const openRandomQuestion = async (browser: Browser) => {
 	const questionPage = await browser.newPage();
 	await questionPage.setViewport({ width: 1920, height: 1080 });
 	await questionPage.goto('https://stackoverflow.com/questions');
-	logs.push('		◦ Launched questions page');
+	logger('		◦ Launched questions page');
 	const questionWrapper = await questionPage.$('#questions');
 	const questionList = (await questionWrapper?.$$('.s-post-summary > div.s-post-summary--content > h3 > a'))?.slice(0, 10);
 	const randomQuestion = questionList?.[Math.floor(Math.random() * questionList?.length)];
 
 	await randomQuestion?.click();
-	logs.push('		◦ Random question clicked');
+	logger('		◦ Random question clicked');
 	await questionPage.waitForNavigation({ timeout: 6000 });
-	logs.push('		◦ Question paged opened');
+	logger('		◦ Question paged opened');
+};
+
+const logger = (message: string) => {
+	logs.push(message);
+	console.log(message.replaceAll('\t\t', '    '));
 };
 
 export async function GET () {
 	try {
+		const startTime = performance.now();
+		console.log(title + '\n');
 		logs = [];
 
-		logs.push('• Launching browser');
-		await sendToTelegram('Stackoverflow Session Triggered', logs);
-		const browser = await getBrowser();
-		logs.push('		◦ Launched successfully');
+		logger('• Launching browser');
+		const browser = await puppeteer.connect({ browserWSEndpoint: `wss://chrome.browserless.io?token=${process.env.BROWSERLESS_TOKEN}` });
+		logger('		◦ Launched successfully');
 
 		try {
-			logs.push('• Logging to Stackoverflow');
+			logger('• Logging to Stackoverflow');
 			await login(browser);
-		} catch (error) {
-			logs.push('		◦ Error: Failed to login, session already exist');
+		} catch (err) {
+			error = true;
+			logger('		◦ Error: Failed to login, session already exist');
 		}
 
 		try {
-			logs.push('• Checking Stackoverflow session');
+			logger('• Checking Stackoverflow session');
 			await checkSession(browser);
 		} catch (err) {
-			logs.push('		◦ Error: ' + err.message);
+			error = true;
+			logger('		◦ Error: ' + err.message);
 		}
 
 		try {
-			logs.push('• Open random stackoverflow question');
+			logger('• Open random stackoverflow question');
 			await openRandomQuestion(browser);
 		} catch (err) {
-			logs.push('		◦ Error: ' + err.message);
+			error = true;
+			logger('		◦ Error: ' + err.message);
 		}
 
 		await browser.close();
-		logs.push('• Browser closed');
+		logger('• Browser closed');
+		logger(`\n• Elapsed Time: ${Math.round(((performance.now() - startTime) / 1000) * 100) / 100} seconds`);
 
-		await sendToTelegram('Stackoverflow Session Triggered', logs);
+		await sendToTelegram(title, logs, error ? button : undefined);
 		return new NextResponse(['Stackoverflow Session Triggered\n', ...logs].map((v) => v.replaceAll('\t\t', '\t')).join('\n'));
-	} catch (err) {
-		return CatchNextResponse(err);
+	}
+	catch (err) {
+		console.log(err);
 	}
 }
 
