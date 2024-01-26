@@ -27,18 +27,11 @@ const login = async (browser: Browser) => {
 };
 
 const checkSession = async (browser: Browser) => {
-	let profilePage;
-
-	try {
-		profilePage = await browser.newPage();
-	}
-	catch (e) {
-		profilePage = await browser.newPage();
-	}
-
-	if (!profilePage) throw 'Unable to launch new browser tab';
-
+	logger('		◦ Launching new browser tab');
+	const profilePage = await browser.newPage();
+	logger('		◦ Setting viewport size');
 	await profilePage.setViewport({ width: 1920, height: 1080 });
+	logger('		◦ Launching stackoverflow home page');
 	await profilePage.goto('https://stackoverflow.com');
 	logger('		◦ Launched stackoverflow home page');
 
