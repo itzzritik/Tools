@@ -16,6 +16,7 @@ ${logs.join('\n')}
 \`\`\`
 
 \`${new Intl.DateTimeFormat('en-IN', options).format(new Date())}\`
+\`Environment: ${process.env.NODE_ENV}\`
 `;
 
 export const sendToTelegram = async (title: string, logs: string[], button?: {text: string, url: string}) => {
